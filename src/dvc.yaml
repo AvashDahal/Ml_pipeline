@@ -1,7 +1,11 @@
 params:
 - dvclive/params.yaml
+- dvclive_logs/params.yaml
 metrics:
 - dvclive/metrics.json
+- dvclive_logs/metrics.json
 plots:
 - dvclive/plots/metrics:
+    x: step
+- dvclive_logs/plots/metrics:
     x: step
