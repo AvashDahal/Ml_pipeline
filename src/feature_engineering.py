@@ -3,6 +3,7 @@ import os
 from sklearn.feature_extraction.text import TfidfVectorizer
 import logging
 import yaml
+import sys
 
 # Ensure the "logs" directory exists
 log_dir = 'logs'
@@ -26,40 +27,56 @@ file_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
-def load_params(params_path: str) -> dict:
-    """Load parameters from a YAML file."""
-    try:
-        with open(params_path, 'r') as file:
-            params = yaml.safe_load(file)
-        logger.debug('Parameters retrieved from %s', params_path)
-        return params
-    except FileNotFoundError:
-        logger.error('File not found: %s', params_path)
-        raise
-    except yaml.YAMLError as e:
-        logger.error('YAML error: %s', e)
-        raise
-    except Exception as e:
-        logger.error('Unexpected error: %s', e)
-        raise
 
-def load_data(file_path: str) -> pd.DataFrame:
-    """Load data from a CSV file."""
+def main():
     try:
-        df = pd.read_csv(file_path)
-        df.fillna('', inplace=True)
-        logger.debug('Data loaded and NaNs filled from %s', file_path)
-        return df
-    except pd.errors.ParserError as e:
-        logger.error('Failed to parse the CSV file: %s', e)
-        raise
-    except Exception as e:
-        logger.error('Unexpected error occurred while loading the data: %s', e)
-        raise
+        # Print debugging information
+        print(f"Current working directory: {os.getcwd()}")
+        print(f"Looking for params.yaml in current directory: {os.path.exists('params.yaml')}")
+        print(f"Looking for params.yaml in parent directory: {os.path.exists('../params.yaml')}")
 
-def apply_tfidf(train_data: pd.DataFrame, test_data: pd.DataFrame, max_features: int) -> tuple:
-    """Apply TfIdf to the data."""
-    try:
+        # Hardcode parameters instead of loading from file
+        max_features = 50
+        logger.info(f"Using hardcoded max_features={max_features}")
+        print(f"Using hardcoded max_features={max_features}")
+
+        # Make sure the required directories exist
+        os.makedirs('./data/interim', exist_ok=True)
+        os.makedirs('./data/processed', exist_ok=True)
+        print("Created required directories")
+
+        # Load data
+        try:
+            train_data = pd.read_csv('./data/interim/train_processed.csv')
+            test_data = pd.read_csv('./data/interim/test_processed.csv')
+            print("Successfully loaded training and test data")
+        except Exception as e:
+            print(f"Error loading data: {e}")
+            logger.error(f"Error loading data: {e}")
+
+            # Check if files exist
+            print(f"Train file exists: {os.path.exists('./data/interim/train_processed.csv')}")
+            print(f"Test file exists: {os.path.exists('./data/interim/test_processed.csv')}")
+
+            # Try alternative paths
+            alt_train_path = '../data/interim/train_processed.csv'
+            alt_test_path = '../data/interim/test_processed.csv'
+            print(f"Alternate train file exists: {os.path.exists(alt_train_path)}")
+            print(f"Alternate test file exists: {os.path.exists(alt_test_path)}")
+
+            # If alternate paths exist, use them
+            if os.path.exists(alt_train_path) and os.path.exists(alt_test_path):
+                train_data = pd.read_csv(alt_train_path)
+                test_data = pd.read_csv(alt_test_path)
+                print("Successfully loaded training and test data from alternate paths")
+            else:
+                raise
+
+        # Fill NA values
+        train_data.fillna('', inplace=True)
+        test_data.fillna('', inplace=True)
+
+        # Apply TF-IDF
         vectorizer = TfidfVectorizer(max_features=max_features)
 
         X_train = train_data['text'].values
@@ -76,38 +93,26 @@ def apply_tfidf(train_data: pd.DataFrame, test_data: pd.DataFrame, max_features:
         test_df = pd.DataFrame(X_test_bow.toarray())
         test_df['label'] = y_test
 
-        logger.debug('tfidf applied and data transformed')
-        return train_df, test_df
+        print("TF-IDF transformation completed")
+
+        # Save processed data
+        train_output_path = './data/processed/train_tfidf.csv'
+        test_output_path = './data/processed/test_tfidf.csv'
+
+        train_df.to_csv(train_output_path, index=False)
+        test_df.to_csv(test_output_path, index=False)
+
+        print(f"Data saved to {train_output_path} and {test_output_path}")
+        print(f"Output files exist: train={os.path.exists(train_output_path)}, test={os.path.exists(test_output_path)}")
+
+        logger.info('Feature engineering process completed successfully')
+        print("Feature engineering completed successfully!")
+
     except Exception as e:
-        logger.error('Error during Tf-IDF transformation: %s', e)
-        raise
-
-def save_data(df: pd.DataFrame, file_path: str) -> None:
-    """Save the dataframe to a CSV file."""
-    try:
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        df.to_csv(file_path, index=False)
-        logger.debug('Data saved to %s', file_path)
-    except Exception as e:
-        logger.error('Unexpected error occurred while saving the data: %s', e)
-        raise
-
-def main():
-    try:
-        params = load_params(params_path='../params.yaml')
-        max_features = params['feature_engineering']['max_features']
-        # max_features = 50
-
-        train_data = load_data('./data/interim/train_processed.csv')
-        test_data = load_data('./data/interim/test_processed.csv')
-
-        train_df, test_df = apply_tfidf(train_data, test_data, max_features)
-
-        save_data(train_df, os.path.join("./data", "processed", "train_tfidf.csv"))
-        save_data(test_df, os.path.join("./data", "processed", "test_tfidf.csv"))
-    except Exception as e:
-        logger.error('Failed to complete the feature engineering process: %s', e)
+        logger.error(f'Failed to complete the feature engineering process: {e}')
         print(f"Error: {e}")
+        sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

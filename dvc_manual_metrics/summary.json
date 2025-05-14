@@ -1,0 +1,20 @@
+{
+    "metrics": {
+        "accuracy": 0.9482288828337875,
+        "precision": 0.8837209302325582,
+        "recall": 0.7307692307692307,
+        "auc": 0.9345102428435763
+    },
+    "params": {
+        "data_ingestion": {
+            "test_size": 0.2
+        },
+        "feature_engineering": {
+            "max_features": 35
+        },
+        "model_building": {
+            "n_estimators": 22,
+            "random_state": 2
+        }
+    }
+}

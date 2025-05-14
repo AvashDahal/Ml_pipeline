@@ -1,4 +1,3 @@
-# Use this alternative file if you continue to have issues with dvclive
 import os
 import numpy as np
 import pandas as pd
@@ -158,7 +157,8 @@ def main():
         # Create output directories first to avoid permission issues
         os.makedirs('reports', exist_ok=True)
 
-        params = load_params(params_path='../params.yaml')
+        # Changed to look for params.yaml in the current directory
+        params = load_params(params_path='./params.yaml')
         clf = load_model('./models/model.pkl')
         test_data = load_data('./data/processed/test_tfidf.csv')
 
