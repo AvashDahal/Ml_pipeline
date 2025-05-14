@@ -1,3 +1,4 @@
+# Use this alternative file if you continue to have issues with dvclive
 import os
 import numpy as np
 import pandas as pd
@@ -6,7 +7,8 @@ import json
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
 import logging
 import yaml
-from dvclive import Live
+import sys
+import json
 
 # Ensure the "logs" directory exists
 log_dir = 'logs'
@@ -116,8 +118,46 @@ def save_metrics(metrics: dict, file_path: str) -> None:
         raise
 
 
+def save_dvc_metrics_manually(metrics: dict, params: dict) -> None:
+    """Save DVC-compatible metrics without using dvclive."""
+    try:
+        # Create the directory structure that DVC expects
+        dvc_dir = "dvc_manual_metrics"
+        os.makedirs(dvc_dir, exist_ok=True)
+
+        # Save metrics to a format DVC can consume
+        metrics_file = os.path.join(dvc_dir, "metrics.json")
+        with open(metrics_file, 'w') as f:
+            json.dump(metrics, f, indent=4)
+        logger.debug(f"Metrics saved to {metrics_file}")
+
+        # Save parameters to a format DVC can consume
+        params_file = os.path.join(dvc_dir, "params.json")
+        with open(params_file, 'w') as f:
+            json.dump(params, f, indent=4)
+        logger.debug(f"Parameters saved to {params_file}")
+
+        # Create a DVC-compatible summary file
+        summary_data = {
+            "metrics": metrics,
+            "params": params
+        }
+        summary_file = os.path.join(dvc_dir, "summary.json")
+        with open(summary_file, 'w') as f:
+            json.dump(summary_data, f, indent=4)
+        logger.debug(f"Summary saved to {summary_file}")
+
+        logger.info("DVC-compatible metrics and parameters saved manually")
+    except Exception as e:
+        logger.error(f"Error saving DVC metrics manually: {e}")
+        logger.warning("Continuing despite manual DVC metrics error")
+
+
 def main():
     try:
+        # Create output directories first to avoid permission issues
+        os.makedirs('reports', exist_ok=True)
+
         params = load_params(params_path='../params.yaml')
         clf = load_model('./models/model.pkl')
         test_data = load_data('./data/processed/test_tfidf.csv')
@@ -127,19 +167,22 @@ def main():
 
         metrics = evaluate_model(clf, X_test, y_test)
 
-        # Experiment tracking using dvclive
-        with Live(dir="dvclive_logs", save_dvc_exp=True) as live:
-
-            live.log_metric('accuracy', accuracy_score(y_test, y_test))
-            live.log_metric('precision', precision_score(y_test, y_test))
-            live.log_metric('recall', recall_score(y_test, y_test))
-
-            live.log_params(params)
-
+        # Save metrics to the reports directory
         save_metrics(metrics, 'reports/metrics.json')
+        logger.debug('Metrics saved successfully')
+
+        # Save DVC-compatible metrics manually (no dvclive dependency)
+        save_dvc_metrics_manually(metrics, params)
+
+        logger.debug('Model evaluation process completed successfully')
+        print("Model evaluation completed successfully!")
+        print(f"Metrics: Accuracy={metrics['accuracy']:.4f}, Precision={metrics['precision']:.4f}, "
+              f"Recall={metrics['recall']:.4f}, AUC={metrics['auc']:.4f}")
+
     except Exception as e:
         logger.error('Failed to complete the model evaluation process: %s', e)
         print(f"Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == '__main__':
